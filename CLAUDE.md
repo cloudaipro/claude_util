@@ -28,6 +28,8 @@ The repository contains shell and Go scripts for Claude Code status line functio
 - Minimal version for Powerlevel10k themes
 - Shows model, directory (truncated to 40 chars), git status, virtual env, and time
 - Git status indicators: `*` (modified), `+` (staged), `?` (untracked)
+- Context usage bar: 5-character progress bar with percentage and token count
+- Progress bar colors: Green (<60%), Gold (60-80%), Red (>80%)
 
 #### claude-stats.sh (Session Statistics)
 - Track and analyze Claude Code usage time
@@ -54,7 +56,7 @@ Status line output includes:
 - Project name (basename of current directory)
 - Git branch (if in git repository)
 - Session duration (Go/Shell versions)
-- Context usage bar (Go version only)
+- Context usage bar with percentage (████░ 87%)
 
 ## Commands
 
