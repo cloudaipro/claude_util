@@ -8,13 +8,14 @@ CACHE_DIR="$HOME/.claude/cache"
 GIT_CACHE="$CACHE_DIR/git_branch"
 mkdir -p "$CACHE_DIR"
 
-# Parse JSON input with single jq invocation
-read -r MODEL SESSION_ID CURRENT_DIR TRANSCRIPT_PATH <<< $(echo "$input" | jq -r '
-    .model.display_name,
-    .session_id,
-    .workspace.current_dir // .cwd,
-    (.transcript_path // "")
-' | tr '\n' ' ')
+# Parse JSON input - use tab as delimiter to handle spaces in values
+parsed_data=$(echo "$input" | jq -r '
+    [.model.display_name,
+     .session_id,
+     (.workspace.current_dir // .cwd),
+     (.transcript_path // "")] | @tsv
+')
+IFS=$'\t' read -r MODEL SESSION_ID CURRENT_DIR TRANSCRIPT_PATH <<< "$parsed_data"
 
 PROJECT_NAME=$(basename "$CURRENT_DIR")
 
@@ -186,12 +187,21 @@ calculate_context_usage() {
                 cache_read = 0
                 cache_creation = 0
 
-                if (match($0, /"input_tokens":[[:space:]]*([0-9]+)/, arr))
-                    input_tokens = arr[1]
-                if (match($0, /"cache_read_input_tokens":[[:space:]]*([0-9]+)/, arr))
-                    cache_read = arr[1]
-                if (match($0, /"cache_creation_input_tokens":[[:space:]]*([0-9]+)/, arr))
-                    cache_creation = arr[1]
+                if (match($0, /"input_tokens":[[:space:]]*[0-9]+/)) {
+                    str = substr($0, RSTART, RLENGTH)
+                    gsub(/[^0-9]/, "", str)
+                    input_tokens = str
+                }
+                if (match($0, /"cache_read_input_tokens":[[:space:]]*[0-9]+/)) {
+                    str = substr($0, RSTART, RLENGTH)
+                    gsub(/[^0-9]/, "", str)
+                    cache_read = str
+                }
+                if (match($0, /"cache_creation_input_tokens":[[:space:]]*[0-9]+/)) {
+                    str = substr($0, RSTART, RLENGTH)
+                    gsub(/[^0-9]/, "", str)
+                    cache_creation = str
+                }
 
                 context_length = input_tokens + cache_read + cache_creation
                 if (context_length > 0) {
@@ -279,8 +289,11 @@ extract_last_user_message() {
             is_user = match($0, /"role":[[:space:]]*"user"/) && match($0, /"type":[[:space:]]*"user"/)
 
             if (!is_sidechain && session_match && is_user) {
-                if (match($0, /"content":[[:space:]]*"([^"]*)"/, arr)) {
-                    content = arr[1]
+                if (match($0, /"content":[[:space:]]*"[^"]*"/)) {
+                    content_str = substr($0, RSTART, RLENGTH)
+                    gsub(/^[^"]*"[[:space:]]*"/, "", content_str)
+                    gsub(/"[[:space:]]*$/, "", content_str)
+                    content = content_str
 
                     if (match(content, /^[\[\{].*[\]\}]$/) ||
                         match(content, /<(local-command-stdout|command-name|command-message|command-args)>/) ||
@@ -340,12 +353,12 @@ venv_info=""
 
 # Output status line in p10k style
 # Model with icon | Directory | Git | Context | Time | Hours
-printf "${MODEL_COLOR}${MODEL_ICON} ${MODEL}${COLOR_RESET} \033[2min\033[0m \033[35m${short_dir}\033[0m${git_info}${CONTEXT_USAGE}${venv_info} | ${TOTAL_HOURS}"
+echo -ne "${MODEL_COLOR}${MODEL_ICON} ${MODEL}${COLOR_RESET} \033[2min\033[0m \033[35m${short_dir}\033[0m${git_info}${CONTEXT_USAGE} | ${TOTAL_HOURS}"
 
 # Optionally add truncated user message (very compact for p10k)
 if [ -n "$LAST_USER_MESSAGE" ]; then
     # Truncate to max 50 chars for p10k
     TRUNCATED_MSG="${LAST_USER_MESSAGE:0:50}"
     [ ${#LAST_USER_MESSAGE} -gt 50 ] && TRUNCATED_MSG="${TRUNCATED_MSG}..."
-    printf " ${COLOR_GRAY}｜${COLOR_MESSAGE}${TRUNCATED_MSG}${COLOR_RESET}"
+    echo -ne " ${COLOR_GRAY}｜${COLOR_MESSAGE}${TRUNCATED_MSG}${COLOR_RESET}"
 fi
