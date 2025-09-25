@@ -30,6 +30,11 @@ The repository contains shell and Go scripts for Claude Code status line functio
 - Git status indicators: `*` (modified), `+` (staged), `?` (untracked)
 - Context usage bar: 5-character progress bar with percentage and token count
 - Progress bar colors: Green (<60%), Gold (60-80%), Red (>80%)
+- Audio alerts when crossing context thresholds:
+  - 50-60%: 1 beep
+  - 60-70%: 2 beeps
+  - 70-80%: 3 beeps
+  - Alerts only trigger once when crossing each threshold
 
 #### claude-stats.sh (Session Statistics)
 - Track and analyze Claude Code usage time

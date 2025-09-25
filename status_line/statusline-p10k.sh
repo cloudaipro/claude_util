@@ -318,6 +318,70 @@ update_session
 archive_old_sessions
 TOTAL_HOURS=$(calculate_total_hours)
 
+# Track beep alerts
+BEEP_ALERT_FILE="$CACHE_DIR/beep_alert_${SESSION_ID}"
+
+# Function to check and play beep alerts
+check_and_play_beep_alerts() {
+    local current_percentage="$1"
+    local alert_file="$2"
+
+    # Read last alerted percentage
+    local last_alerted_percentage=0
+    if [ -f "$alert_file" ]; then
+        last_alerted_percentage=$(cat "$alert_file" 2>/dev/null || echo 0)
+    fi
+
+    # Determine if we need to alert based on crossing thresholds
+    local beep_count=0
+
+    if [ "$current_percentage" -ge 50 ] && [ "$current_percentage" -lt 60 ]; then
+        if [ "$last_alerted_percentage" -lt 50 ]; then
+            beep_count=1
+            echo "50" > "$alert_file"
+        fi
+    elif [ "$current_percentage" -ge 60 ] && [ "$current_percentage" -lt 70 ]; then
+        if [ "$last_alerted_percentage" -lt 60 ]; then
+            beep_count=2
+            echo "60" > "$alert_file"
+        fi
+    elif [ "$current_percentage" -ge 70 ] && [ "$current_percentage" -lt 80 ]; then
+        if [ "$last_alerted_percentage" -lt 70 ]; then
+            beep_count=3
+            echo "70" > "$alert_file"
+        fi
+    elif [ "$current_percentage" -ge 80 ]; then
+        # Update the file to prevent repeated alerts when above 80%
+        if [ "$last_alerted_percentage" -lt 80 ]; then
+            echo "80" > "$alert_file"
+        fi
+    elif [ "$current_percentage" -lt 50 ]; then
+        # Reset alert state when below 50%
+        [ -f "$alert_file" ] && rm "$alert_file"
+    fi
+
+    # Play beep sounds using multiple methods for better compatibility
+    if [ "$beep_count" -gt 0 ]; then
+        # Try different audio methods based on OS
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS: Use osascript for reliable system beep
+            for ((i=1; i<=beep_count; i++)); do
+                osascript -e "beep" 2>/dev/null || afplay /System/Library/Sounds/Tink.aiff 2>/dev/null || printf '\a'
+                [ "$i" -lt "$beep_count" ] && sleep 0.3
+            done
+        else
+            # Linux/Other: Try multiple methods
+            for ((i=1; i<=beep_count; i++)); do
+                # Try paplay first (PulseAudio), then beep command, then terminal bell
+                (paplay /usr/share/sounds/freedesktop/stereo/bell.oga 2>/dev/null || \
+                 beep 2>/dev/null || \
+                 printf '\a') &
+                [ "$i" -lt "$beep_count" ] && sleep 0.3
+            done
+        fi
+    fi
+}
+
 # Context usage
 CONTEXT_USAGE=""
 if [ -n "$TRANSCRIPT_PATH" ] && [ "$TRANSCRIPT_PATH" != "null" ] && [ "$TRANSCRIPT_PATH" != "" ]; then
@@ -326,6 +390,9 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ "$TRANSCRIPT_PATH" != "null" ] && [ "$TRANSCRI
     if [ -n "$CONTEXT_LENGTH" ] && [ "$CONTEXT_LENGTH" != "0" ]; then
         CONTEXT_PERCENTAGE=$((CONTEXT_LENGTH * 100 / 200000))
         [ "$CONTEXT_PERCENTAGE" -gt 100 ] && CONTEXT_PERCENTAGE=100
+
+        # Check and play beep alerts based on thresholds
+        check_and_play_beep_alerts "$CONTEXT_PERCENTAGE" "$BEEP_ALERT_FILE"
 
         PROGRESS_BAR=$(generate_progress_bar "$CONTEXT_PERCENTAGE")
         FORMATTED_NUM=$(format_number "$CONTEXT_LENGTH")

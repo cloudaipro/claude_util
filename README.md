@@ -15,6 +15,11 @@ Powerlevel10k-optimized status line for Claude Code showing:
   - 5-character progress bar (█████ full, ░░░░░ empty)
   - Color-coded by usage: Green <60%, Gold 60-80%, Red >80%
   - Percentage and token count (e.g., `████░ 87% 174k`)
+- Audio alerts for context thresholds:
+  - 50-60%: 1 beep sound
+  - 60-70%: 2 beep sounds (0.3s interval)
+  - 70-80%: 3 beep sounds (0.3s interval)
+  - Alerts trigger only once per threshold crossing
 - Session duration tracking
 - Last user message preview (truncated to 50 chars)
 
